@@ -16,8 +16,12 @@ Setup::
 
     # Option 2: Docker
     docker run -p 9377:9377 -e CAMOFOX_PORT=9377 jo-inc/camofox-browser
+    
+Alternatively, if the https://github.com/redf0x1/camofox-browser/ is
+preferred, there CAMOFOX_API_KEY can be set for remote servers.
 
-Then set ``CAMOFOX_URL=http://localhost:9377`` in ``~/.hermes/.env``.
+Then set ``CAMOFOX_URL=http://localhost:9377``, as well as
+``CAMOFOX_API_KEY={{ api_key }}`` if needed in ``~/.hermes/.env``.
 """
 
 from __future__ import annotations
@@ -37,6 +41,15 @@ from tools.browser_camofox_state import get_camofox_identity
 from tools.registry import tool_error
 
 logger = logging.getLogger(__name__)
+
+def _get_headers() -> Dict[str, str]:
+    """Return headers including CAMOFOX_API_KEY if set."""
+    headers = {}
+    api_key = os.getenv("CAMOFOX_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -73,7 +86,7 @@ def check_camofox_available() -> bool:
     if not url:
         return False
     try:
-        resp = requests.get(f"{url}/health", timeout=5)
+        resp = requests.get(f"{url}/health", headers=_get_headers(), timeout=5)
         if resp.status_code == 200 and not _vnc_url_checked:
             try:
                 data = resp.json()
@@ -166,6 +179,7 @@ def _ensure_tab(task_id: Optional[str], url: str = "about:blank") -> Dict[str, A
             "sessionKey": session["session_key"],
             "url": url,
         },
+        headers=_get_headers(),
         timeout=_DEFAULT_TIMEOUT,
     )
     resp.raise_for_status()
@@ -204,7 +218,7 @@ def camofox_soft_cleanup(task_id: Optional[str] = None) -> bool:
 def _post(path: str, body: dict, timeout: int = _DEFAULT_TIMEOUT) -> dict:
     """POST JSON to camofox and return parsed response."""
     url = f"{get_camofox_url()}{path}"
-    resp = requests.post(url, json=body, timeout=timeout)
+    resp = requests.post(url, json=body, headers=_get_headers(), timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -212,7 +226,7 @@ def _post(path: str, body: dict, timeout: int = _DEFAULT_TIMEOUT) -> dict:
 def _get(path: str, params: dict = None, timeout: int = _DEFAULT_TIMEOUT) -> dict:
     """GET from camofox and return parsed response."""
     url = f"{get_camofox_url()}{path}"
-    resp = requests.get(url, params=params, timeout=timeout)
+    resp = requests.get(url, params=params, headers=_get_headers(), timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -220,7 +234,7 @@ def _get(path: str, params: dict = None, timeout: int = _DEFAULT_TIMEOUT) -> dic
 def _get_raw(path: str, params: dict = None, timeout: int = _DEFAULT_TIMEOUT) -> requests.Response:
     """GET from camofox and return raw response (for binary data)."""
     url = f"{get_camofox_url()}{path}"
-    resp = requests.get(url, params=params, timeout=timeout)
+    resp = requests.get(url, params=params, headers=_get_headers(), timeout=timeout)
     resp.raise_for_status()
     return resp
 
@@ -228,7 +242,7 @@ def _get_raw(path: str, params: dict = None, timeout: int = _DEFAULT_TIMEOUT) ->
 def _delete(path: str, body: dict = None, timeout: int = _DEFAULT_TIMEOUT) -> dict:
     """DELETE to camofox and return parsed response."""
     url = f"{get_camofox_url()}{path}"
-    resp = requests.delete(url, json=body, timeout=timeout)
+    resp = requests.delete(url, json=body, headers=_get_headers(), timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
